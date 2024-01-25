@@ -1,0 +1,65 @@
+# GitHub Actions
+
+name: Compilation Job
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Update system packages
+        run: sudo apt update -y
+
+      - name: Install required packages
+        run: |
+          sudo apt install -y git curl nodejs make clang
+          sudo apt install -y linux-headers-$(uname -r)
+          
+      #- name: Install Go
+      #  run: |
+      #    wget https://golang.google.cn/dl/go1.21.5.linux-amd64.tar.gz
+      #    sudo rm -rf /usr/local/go && sudo tar -C /usr/local -xzf go1.21.5.linux-amd64.tar.gz
+      #    export PATH=$PATH:/usr/local/go/bin
+      - name: Setup Golang
+        uses: actions/setup-go@v5.0.0
+        with:
+          go-version: '1.21.5' # The Go version to download (if necessary) and use.
+
+      - name: Clone repositories
+        run: |
+          git clone --depth=1 https://github.com/daeuniverse/daed
+          git clone https://github.com/daeuniverse/dae-wing daed/wing
+          git clone https://github.com/daeuniverse/dae daed/wing/dae-core
+          git clone https://github.com/daeuniverse/dae_bpf_headers daed/wing/dae-core/control/kern/headers
+          cd daed
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2.4.0
+        with:
+          version: 8
+      #- name: Install pnpm
+      #  run: | 
+      #    cd daed
+      #    curl -fsSL https://get.pnpm.io/install.sh | sh -
+        
+      - name: Initialize submodules
+        run: | 
+          cd daed/wing
+          git submodule update --init --recursive
+
+      - name: Build daed
+        run: |
+          cd daed
+          make VERSION=0.5.1 CGO_ENABLED=0 -j2 V=s
+
+      - name: Upload a Build Artifact
+        uses: actions/upload-artifact@v4.1.0
+        with:
+          name: daed
+          path: daed/daed
+          if-no-files-found: error
